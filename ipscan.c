@@ -9,7 +9,7 @@
 #include <linux/if_arp.h>
 #include <unistd.h>
 
-#include "macscan.h"
+#include "ipscan.h"
 #include "zhuxi_debug.h"
 
 static int 				arpsock;
@@ -17,7 +17,6 @@ char 					devname[16];
 char 					outfile[64];
 char 					configfile[64];
 static struct in_addr	ipaddr,netmask;
-static struct in_addr	startip,endip;
 static unsigned short	add=0;				
 sigset_t				g_ns;
 struct devinfo			*devinfo_list = NULL;
@@ -28,9 +27,26 @@ static int				idle = 0;
 static int				scan_max_time = 0;
 static char 			exphosts[IPMAC_EXPHOST_MAX][32];
 
+static int pack_count = 1;
+static int time_out = 30;
+
+typedef struct IpPool{
+	char *name;
+	struct IpPool *next;
+}T_IpPool, *PT_IpPool;
+
+typedef struct IpCollection{
+	struct in_addr startip;
+	struct in_addr endip;
+	struct IpCollection *next;
+}T_IpCollection, *PT_IpCollection;
+
+PT_IpPool IpPoolHead;
+PT_IpCollection IpCollectHead;
+
 static void usage()
 {
-	printf("usage:  macscan  < -c configfile | -n netaddr -m netmask | -s startip -e endip> [ -i devname ] [ -o outfile ] [ -a ]\n");
+	printf("usage:  ipscan < -i ip_pool > [-c configfile ] [-w timeval] [ -d devname ]\n");
     exit(1);
 }
 
@@ -56,8 +72,8 @@ int main(int argc,char **argv)
 	get_devinfo(devname);
 	get_scan_list();
 	get_exphost();
-	if(add)
-		read_macband_list();
+	/*if(add)*/
+		/*read_macband_list();*/
 	
  	tv_out.tv_sec=TIMEOUT_SEC;
  	tv_out.tv_usec=TIMEOUT_USEC;
@@ -128,54 +144,90 @@ int main(int argc,char **argv)
 static void parse_args( int argc, char** argv )
 {
 	int				c;
+	char *token = NULL, *tmp[2];
+	int i = 0;
+	struct in_addr	startip,endip;
+	PT_IpPool ptmp, psave;
+	T_IpPool IpPoolTmp;
+	PT_IpCollection pIpCollecttmp, pIpCollectSave;
+	T_IpCollection IpCollectionTmp;
 
 	if(argc < 3)
 		usage();
 
 	memset(devname,0,sizeof(devname));
-	memset(outfile,0,sizeof(outfile));
-	memset(configfile,0,sizeof(configfile));
 	memset(&ipaddr,0,4);
-	memset(&netmask,0,4);
 	startip.s_addr = 0;
 	endip.s_addr = 0;
-	while((c=getopt(argc,argv,"c:n:m:s:e:i:o:a")) != -1){
+	while((c=getopt(argc,argv,"c:w:d:i:")) != -1){
 		switch(c){
 			case 'c':
-				strncpy(configfile,optarg,sizeof(configfile));
+				pack_count = atoi(optarg);
+				/*printf("pack_count=%d\n", pack_count);*/
 			  	break;
-			case 'n':
-			  	if(!inet_aton(optarg,&ipaddr)){
-					ZHUXI_DBGP(("%s : bad IP address format !\n",optarg));
-					usage();
-			  	}
+			case 'w':
+				time_out= atoi(optarg);
+				/*printf("time_out=%d\n", time_out);*/
 			  	break;
-			case 'm':
-			  	if(!inet_aton(optarg,&netmask)){
-					ZHUXI_DBGP(("%s : bad IP address format !\n",optarg));
-					usage();
-			  	}
-			  	break;
-			case 's':
-			  	if(!inet_aton(optarg,&startip)){
-					ZHUXI_DBGP(("%s : bad IP address format !\n",optarg));
-					usage();
-			  	}
-			  	break;
-			case 'e':
-			  	if(!inet_aton(optarg,&endip)){
-					ZHUXI_DBGP(("%s : bad IP address format !\n",optarg));
-					usage();
-			  	}
-			  	break;
+
 			case 'i':
+				/*printf("%s, %s\n", tmp[0], tmp[1]);*/
+				token = strtok(optarg, ",");
+				printf("%s\n", token);
+				IpPoolTmp.name = strtok(optarg, ",");
+				psave = &IpPoolTmp;
+				IpPoolHead = psave;
+				psave->next = NULL;
+				/*IpPoolTmp->next = NULL;*/
+
+				while((token = strtok(NULL, ",")) != NULL)
+				{
+					ptmp = IpPoolHead;
+					while (ptmp->next)
+					{
+						ptmp = ptmp->next;
+					}
+					IpPoolTmp.name = token;
+					psave = &IpPoolTmp;
+					ptmp->next = psave;
+					psave->next = NULL;
+				}
+
+				ptmp = IpPoolHead;
+				while(ptmp)
+				{
+					tmp[0] = strtok(ptmp->name, "-");
+
+					while((token = strtok(NULL, "-")) != NULL)
+					{
+						tmp[1] = token;
+					}
+
+					if(!inet_aton(tmp[0], &startip)){
+						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));
+						 usage();
+					 }
+					if(!inet_aton(tmp[1], &endip)){
+						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));
+						 usage();
+					 }
+
+					IpCollectionTmp.startip = startip;
+					IpCollectionTmp.endip = endip;
+					pIpCollectSave = &IpCollectionTmp;
+					pIpCollecttmp = IpCollectHead;
+					while(pIpCollecttmp->next)
+					{
+						pIpCollecttmp = pIpCollecttmp->next;
+					}
+					pIpCollecttmp->next = pIpCollectSave;
+					pIpCollectSave->next = NULL;
+					/*printf("%s, %s\n", tmp[0], tmp[1]);*/
+					ptmp = ptmp->next;
+				}
+				break;
+			case 'd':
 				strncpy(devname,optarg,sizeof(devname));
-			  	break;
-			case 'o':
-				strncpy(outfile,optarg,sizeof(outfile));
-			  	break;
-			case 'a':
-				add=1;
 			  	break;
 			default :
 				usage();
@@ -184,15 +236,10 @@ static void parse_args( int argc, char** argv )
 	if (optind != argc) 
 		usage();
 
-	if(!strlen(configfile) && !(ipaddr.s_addr && netmask.s_addr) && !(startip.s_addr && endip.s_addr))
-		usage();
 	if(!strlen(devname))
 		strncpy(devname,DEFDEV,sizeof(devname));
-	if(!strlen(outfile))
-		strncpy(outfile,DEF_FILE,sizeof(outfile));
 		
 	ZHUXI_MSGP(("configfile=%s,ipaddr=%s,",configfile,inet_ntoa(ipaddr)));
-	ZHUXI_MSGP(("netmask=%s,devname=%s,outfile=%s,add=%d=\n",inet_ntoa(netmask),devname,outfile,add));
 }
 
 static int create_arpsock(char *ifname,struct sockaddr_ll *from)

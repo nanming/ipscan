@@ -1,8 +1,8 @@
 #ifndef _ZHUXI_DEBUG_H
 #define _ZHUXI_DEBUG_H
 
-#define ZHUXI_DBG	1
-#define ZHUXI_MSG	1
+#define ZHUXI_DBG	0
+#define ZHUXI_MSG	0
 
 #if	ZHUXI_DBG
 #define ZHUXI_DBGP(_x_) do{	\

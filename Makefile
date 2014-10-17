@@ -1,8 +1,8 @@
 CC=$(CROSS_COMPILE)gcc
 STRIP=$(CROSS_COMPILE)strip
 
-TARGET_1=macscan
-TARGET_1_OBJS=macscan.o
+TARGET_1=ipscan
+TARGET_1_OBJS=ipscan.o
 
 all : $(TARGET_1)
 

@@ -1,7 +1,7 @@
 #ifndef _MACSACN_H
 #define _MACSACN_H
 
-#define DEFDEV					"eth2.1"
+#define DEFDEV					"eth0"
 #define	DEF_FILE				"/tmp/macscan.tmp"
 #define	MACBAND_FILE			"/etc/kingcan/macband_list.cfg"
 #define IPMAC_EXPHOST_FILE		"/etc/kingcan/macband_exphost.cfg"
