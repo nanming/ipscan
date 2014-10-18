@@ -35,18 +35,18 @@ typedef struct IpPool{
 	struct IpPool *next;
 }T_IpPool, *PT_IpPool;
 
-typedef struct IpCollection{
-	struct in_addr startip;
-	struct in_addr endip;
-	struct IpCollection *next;
-}T_IpCollection, *PT_IpCollection;
+typedef struct IpScanAddr{
+	struct in_addr start_ip;
+	struct in_addr end_ip;
+	struct IpScanAddr *next;
+}T_IpScanAddr, *PT_IpScanAddr;
 
 PT_IpPool IpPoolHead;
-PT_IpCollection IpCollectHead;
+PT_IpScanAddr IpScanAddrHead;
 
 static void usage()
 {
-	printf("usage:  ipscan < -i ip_pool > [-c configfile ] [-w timeval] [ -d devname ]\n");
+	printf("usage:  ipscan < -i ip_pool > [-c pack_count] [-w timeval] [ -d devname ]\n");
     exit(1);
 }
 
@@ -59,7 +59,8 @@ int main(int argc,char **argv)
 	ETH_HEADER 				*ethh=(ETH_HEADER *)buf;
 	ARP_HEADER 				*arph=(ARP_HEADER *)(ethh+1);
 	uint32_t				cur,max;
-	struct scanaddr			*si;
+	PT_IpScanAddr 				si;
+
 	int						i,on=1,count = 0;
 	
 	parse_args(argc,argv);
@@ -70,7 +71,7 @@ int main(int argc,char **argv)
 	for(i=0;i<256;i++)
 		ipmac_list[i] = NULL;
 	get_devinfo(devname);
-	get_scan_list();
+	/*get_scan_list();*/
 	get_exphost();
 	/*if(add)*/
 		/*read_macband_list();*/
@@ -101,7 +102,7 @@ int main(int argc,char **argv)
 	memcpy(arph->s_mac,arpfrom.sll_addr,ETH_ALEN);
 	memcpy(arph->d_mac,arpto.sll_addr,ETH_ALEN);
 	
-	if(!(si=scanaddr_list))
+	if(!(si=IpScanAddrHead))
 		return 1;
 
 	alen = sizeof(struct sockaddr_ll);
@@ -149,8 +150,8 @@ static void parse_args( int argc, char** argv )
 	struct in_addr	startip,endip;
 	PT_IpPool ptmp, psave;
 	T_IpPool IpPoolTmp;
-	PT_IpCollection pIpCollecttmp, pIpCollectSave;
-	T_IpCollection IpCollectionTmp;
+	PT_IpScanAddr pIpScanAddrtmp, pIpScanAddrSave;
+	T_IpScanAddr IpScanAddrTmp;
 
 	if(argc < 3)
 		usage();
@@ -171,23 +172,20 @@ static void parse_args( int argc, char** argv )
 			  	break;
 
 			case 'i':
-				/*printf("%s, %s\n", tmp[0], tmp[1]);*/
-				token = strtok(optarg, ",");
-				printf("%s\n", token);
 				IpPoolTmp.name = strtok(optarg, ",");
 				psave = &IpPoolTmp;
 				IpPoolHead = psave;
 				psave->next = NULL;
-				/*IpPoolTmp->next = NULL;*/
-
 				while((token = strtok(NULL, ",")) != NULL)
 				{
 					ptmp = IpPoolHead;
+					/*printf("iptools = %s\n", ptmp->name);*/
 					while (ptmp->next)
 					{
 						ptmp = ptmp->next;
 					}
 					IpPoolTmp.name = token;
+					/*printf("iptools = %s\n", token);*/
 					psave = &IpPoolTmp;
 					ptmp->next = psave;
 					psave->next = NULL;
@@ -196,32 +194,46 @@ static void parse_args( int argc, char** argv )
 				ptmp = IpPoolHead;
 				while(ptmp)
 				{
-					tmp[0] = strtok(ptmp->name, "-");
+					/*printf("iptools = %s\n", ptmp->name);*/
+					/*tmp[0] = strtok(ptmp->name, "-");*/
 
-					while((token = strtok(NULL, "-")) != NULL)
-					{
-						tmp[1] = token;
-					}
+					/*while((token = strtok(NULL, "-")) != NULL)*/
+					/*{*/
+						/*tmp[1] = token;*/
+					/*}*/
 
-					if(!inet_aton(tmp[0], &startip)){
-						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));
-						 usage();
-					 }
-					if(!inet_aton(tmp[1], &endip)){
-						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));
-						 usage();
-					 }
+					/*printf("%s, %s\n", tmp[0], tmp[1]);*/
+					/*if(!inet_aton(tmp[0], &startip)){*/
+						 /*ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));*/
+						 /*usage();*/
+					 /*}*/
+					/*if(!inet_aton(tmp[1], &endip)){*/
+						 /*ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));*/
+						 /*usage();*/
+					 /*}*/
 
-					IpCollectionTmp.startip = startip;
-					IpCollectionTmp.endip = endip;
-					pIpCollectSave = &IpCollectionTmp;
-					pIpCollecttmp = IpCollectHead;
-					while(pIpCollecttmp->next)
-					{
-						pIpCollecttmp = pIpCollecttmp->next;
-					}
-					pIpCollecttmp->next = pIpCollectSave;
-					pIpCollectSave->next = NULL;
+					/*[>IpScanAddrTmp.start_ip.s_addr = startip.s_addr;<]*/
+					/*[>IpScanAddrTmp.end_ip.s_addr = endip.s_addr;<]*/
+					/*IpScanAddrTmp.start_ip = startip;*/
+					/*IpScanAddrTmp.end_ip = endip;*/
+					/*if (IpScanAddrHead == NULL)*/
+					/*{*/
+						/*pIpScanAddrSave = &IpScanAddrTmp;*/
+						/*IpScanAddrHead = pIpScanAddrSave;*/
+						/*pIpScanAddrSave->next = NULL;*/
+					/*}	*/
+					/*else*/
+					/*{*/
+						/*pIpScanAddrtmp = IpScanAddrHead;*/
+						/*while(pIpScanAddrtmp->next)*/
+						/*{*/
+							/*pIpScanAddrtmp = pIpScanAddrtmp->next;*/
+						/*}*/
+						/*printf("%d, %d\n", startip.s_addr, endip.s_addr);*/
+						/*pIpScanAddrSave = &IpScanAddrTmp;*/
+						/*pIpScanAddrtmp->next = pIpScanAddrSave;*/
+						/*pIpScanAddrSave->next = NULL;*/
+					/*}*/
 					/*printf("%s, %s\n", tmp[0], tmp[1]);*/
 					ptmp = ptmp->next;
 				}
@@ -506,6 +518,7 @@ static void get_devinfo(char *ifname)
 */
 }
 
+#if 0
 static void get_scan_list(void)
 {
 	struct scanaddr			**sl=&scanaddr_list;
@@ -571,6 +584,7 @@ static void get_scan_list(void)
 	}
 */
 }
+#endif
 int get_sendip(uint32_t recvip,struct in_addr *sendip)
 {
 	struct devinfo			*di=devinfo_list;
