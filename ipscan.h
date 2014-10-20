@@ -49,6 +49,7 @@ struct ipmac
 	struct in_addr	 	ip;
 	unsigned char 		mac[6];
 	unsigned short		bind;
+	long int 		seconds;
 	char				notes[64];
 };
 
