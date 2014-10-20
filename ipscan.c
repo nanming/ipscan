@@ -43,12 +43,15 @@ typedef struct IpScanAddr{
 	struct IpScanAddr *next;
 }T_IpScanAddr, *PT_IpScanAddr;
 
-PT_IpPool IpPoolHead;
-PT_IpScanAddr IpScanAddrHead;
+PT_IpPool IpPoolHead = NULL;
+PT_IpScanAddr IpScanAddrHead = NULL;
 
 static void usage()
 {
-	printf("usage:  ipscan < -i ip_pool > [-c pack_count] [-w timeval] [ -d devname ]\n");
+	printf("usage:  ipscan < -i ip_pool > [-c pack_count] [-w timeval] [ -d devname ] [-o outputfile]\n");
+	printf("\n	example: ./ipscan -i 192.168.0.73,192.168.0.100\n");
+	printf("	         ./ipscan -i 192.168.0.0-192.168.0.255\n");
+	printf("	         ./ipscan -i 192.168.0.0-192.168.0.255,192.168.1.0-192.168.1.255\n");
     exit(1);
 }
 
@@ -64,7 +67,7 @@ int main(int argc,char **argv)
 	PT_IpScanAddr 				si;
 	/*pthread_t 				tid = 0;*/
 
-	int						i,j,on=1,count = 0;
+	int						i,j = 1,on=1,count = 0;
 	
 	parse_args(argc,argv);
 
@@ -119,6 +122,7 @@ int main(int argc,char **argv)
 
 	while(j <= pack_count)
 	{
+		si=IpScanAddrHead;
 		while(si){
 			cur = ntohl(si->start_ip.s_addr);
 			max = ntohl(si->end_ip.s_addr);
@@ -134,9 +138,9 @@ int main(int argc,char **argv)
 
 				((struct in_addr *)arph->d_ip)->s_addr = htonl(cur);
 				sendto(arpsock,buf,ETH_LEN+ARPH_LEN,0,(struct sockaddr*)&arpto,alen);
-				usleep(1000);
+				usleep(10);
 			}
-		si = si->next;
+			si = si->next;
 			if(count > MAX_SCAN_IP)
 				break;
 		}
@@ -146,7 +150,7 @@ int main(int argc,char **argv)
 	signal(SIGALRM,stop_recv_arp);
 	alarm(1);
 	while(1){
-		sleep(100);
+		sleep(1000);
 	};
 	return 0;
 }
@@ -158,7 +162,7 @@ static void parse_args( int argc, char** argv )
 	int length = 0;
 	int token_flag = 0;
 	struct in_addr	startip,endip;
-	PT_IpPool ptmp, psave;
+	PT_IpPool ptmp;
 	PT_IpPool IpPoolTmp;
 	PT_IpScanAddr pIpScanAddrtmp, pIpScanAddrSave;
 	PT_IpScanAddr IpScanAddrTmp;
@@ -170,7 +174,7 @@ static void parse_args( int argc, char** argv )
 	memset(&ipaddr,0,4);
 	startip.s_addr = 0;
 	endip.s_addr = 0;
-	while((c=getopt(argc,argv,"c:w:d:i:")) != -1){
+	while((c=getopt(argc,argv,"c:w:d:i:o:")) != -1){
 		switch(c){
 			case 'c':
 				pack_count = atoi(optarg);
@@ -180,10 +184,6 @@ static void parse_args( int argc, char** argv )
 			  	break;
 
 			case 'i':
-				if (IpPoolHead != NULL)
-				{
-					IpPoolHead = NULL;
-				}
 				if (!(IpPoolTmp = (PT_IpPool)malloc(sizeof(struct IpPool))))
 				{
 					ZHUXI_DBGP(("malloc failed !\n"));
@@ -202,7 +202,7 @@ static void parse_args( int argc, char** argv )
 					IpPoolTmp->name = token;
 					if (IpPoolHead == NULL)
 					{
-						IpPoolHead = psave;
+						IpPoolHead = IpPoolTmp;
 					}
 					else
 					{
@@ -234,12 +234,14 @@ static void parse_args( int argc, char** argv )
 						tmp[1] = tmp[0];
 					}
 
+					token_flag = 0;
+
 					if(!inet_aton(tmp[0], &startip)){
 						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));
 						 usage();
 					 }
 					if(!inet_aton(tmp[1], &endip)){
-						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));
+						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[1]));
 						 usage();
 					 }
 
@@ -269,19 +271,13 @@ static void parse_args( int argc, char** argv )
 					}
 					ptmp = ptmp->next;
 				}
-				/*pIpScanAddrtmp = IpScanAddrHead;*/
-#if 0
-				while(pIpScanAddrtmp)
-				{
-					length++;
-					pIpScanAddrtmp = pIpScanAddrtmp->next;
-				}
-				printf("length = %d\n", length);
-#endif
 				break;
 			case 'd':
 				strncpy(devname,optarg,sizeof(devname));
 			  	break;
+			case 'o':
+				strncpy(outfile,optarg,sizeof(outfile));
+				break;
 			default :
 				usage();
 		}
@@ -291,6 +287,8 @@ static void parse_args( int argc, char** argv )
 
 	if(!strlen(devname))
 		strncpy(devname,DEFDEV,sizeof(devname));
+	if(!strlen(outfile))
+		strncpy(outfile,DEF_FILE,sizeof(outfile));
 		
 	/*ZHUXI_MSGP(("configfile=%s,ipaddr=%s,",configfile,inet_ntoa(ipaddr)));*/
 }
@@ -340,6 +338,7 @@ static int create_arpsock(char *ifname,struct sockaddr_ll *from)
 	return sock;
 }
 
+#if 0
 void read_macband_list(void)
 {
 	FILE					*fd;
@@ -395,6 +394,7 @@ void read_macband_list(void)
 	}
 */
 }
+#endif
 
 static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int seconds)
 {
@@ -476,10 +476,10 @@ void recv_arp_pkt()
 	memset(data,0,sizeof(data));
 	sigprocmask(SIG_BLOCK,&g_ns,NULL);
 	while(1){
-		seconds = time((time_t*)NULL);	
 		if((ret=recvfrom(arpsock,data,sizeof(data),0,(struct sockaddr*)&ans_addr,&alen)) < 0){
 			break;
 		}
+		seconds = time((time_t*)NULL);	
 		/*printf("time = %ld\n", seconds);*/
 		unpack_arp(data,ret,&ans_addr, seconds);
 		seconds = 0;
@@ -671,10 +671,10 @@ void stop_recv_arp()
 	signal(SIGIO,SIG_IGN);
 	shutdown(arpsock,SHUT_RDWR);
 
-//	if(!(fd=fopen(outfile,"w+"))){
-//		ZHUXI_DBGP(("fopen %s failed !\n",outfile));
-//		exit(1);
-//	}
+	if(!(fd=fopen(outfile,"w+"))){
+		ZHUXI_DBGP(("fopen %s failed !\n",outfile));
+		exit(1);
+	}
 	for(i=0;i<256;i++){
 		mi = ipmac_list[i];
 		while(mi){
@@ -687,7 +687,7 @@ void stop_recv_arp()
 			}else{
 				/*printf("%s %02X:%02X:%02X:%02X:%02X:%02X\n",inet_ntoa(mi->ip),\*/
 					/*mi->mac[0],mi->mac[1],mi->mac[2],mi->mac[3],mi->mac[4],mi->mac[5]);*/
-				printf("%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", mi->seconds,\
+				fprintf(fd, "%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", mi->seconds,\
 					mi->mac[0],mi->mac[1],mi->mac[2],mi->mac[3],mi->mac[4],mi->mac[5], inet_ntoa(mi->ip));
 			}
 			mi = mi->next;

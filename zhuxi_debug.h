@@ -1,16 +1,16 @@
 #ifndef _ZHUXI_DEBUG_H
 #define _ZHUXI_DEBUG_H
 
-#define ZHUXI_DBG	1
-#define ZHUXI_MSG	1
+#define ZHUXI_DBG	0
+#define ZHUXI_MSG	0
 
 #if	ZHUXI_DBG
 #define ZHUXI_DBGP(_x_) do{	\
     printf("===%s->%s(%d)=== \n",__FILE__,__func__,__LINE__);	\
-    printf _x_;	\
+    printf _x_;\
 }while(0)
 #else
-#define ZHUXI_DBGP(_x_)
+#define ZHUXI_DBGP(_x_) printf _x_
 #endif
 
 #if	ZHUXI_MSG
@@ -18,7 +18,8 @@
     printf _x_;	\
 }while(0)
 #else
-#define ZHUXI_MSGP(_x_)
+//#define ZHUXI_MSGP(_x_)
+#define ZHUXI_MSGP(_x_) printf _x_
 #endif
 
 #if	ZHUXI_DBG
