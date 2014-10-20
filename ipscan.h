@@ -2,7 +2,7 @@
 #define _MACSACN_H
 
 #define DEFDEV					"eth0"
-#define	DEF_FILE				"/tmp/macscan.tmp"
+#define	DEF_FILE				"/tmp/ipscan.tmp"
 #define	MACBAND_FILE			"/etc/kingcan/macband_list.cfg"
 #define IPMAC_EXPHOST_FILE		"/etc/kingcan/macband_exphost.cfg"
 #define IPMAC_EXPHOST_MAX		10

@@ -48,7 +48,7 @@ PT_IpScanAddr IpScanAddrHead;
 
 static void usage()
 {
-	printf("usage:  ipscan < -i ip_pool > [-c pack_count] [-w timeval] [ -d devname ]\n");
+	printf("usage:  ipscan < -i ip_pool > [-c pack_count] [-w timeval] [ -d devname ] [-o outputfile]\n");
     exit(1);
 }
 
@@ -119,6 +119,7 @@ int main(int argc,char **argv)
 
 	while(j <= pack_count)
 	{
+		si=IpScanAddrHead;
 		while(si){
 			cur = ntohl(si->start_ip.s_addr);
 			max = ntohl(si->end_ip.s_addr);
@@ -170,7 +171,7 @@ static void parse_args( int argc, char** argv )
 	memset(&ipaddr,0,4);
 	startip.s_addr = 0;
 	endip.s_addr = 0;
-	while((c=getopt(argc,argv,"c:w:d:i:")) != -1){
+	while((c=getopt(argc,argv,"c:w:d:i:o:")) != -1){
 		switch(c){
 			case 'c':
 				pack_count = atoi(optarg);
@@ -282,6 +283,9 @@ static void parse_args( int argc, char** argv )
 			case 'd':
 				strncpy(devname,optarg,sizeof(devname));
 			  	break;
+			case 'o':
+				strncpy(outfile,optarg,sizeof(outfile));
+				break;
 			default :
 				usage();
 		}
@@ -291,6 +295,8 @@ static void parse_args( int argc, char** argv )
 
 	if(!strlen(devname))
 		strncpy(devname,DEFDEV,sizeof(devname));
+	if(!strlen(outfile))
+		strncpy(outfile,DEF_FILE,sizeof(outfile));
 		
 	/*ZHUXI_MSGP(("configfile=%s,ipaddr=%s,",configfile,inet_ntoa(ipaddr)));*/
 }
@@ -671,10 +677,10 @@ void stop_recv_arp()
 	signal(SIGIO,SIG_IGN);
 	shutdown(arpsock,SHUT_RDWR);
 
-//	if(!(fd=fopen(outfile,"w+"))){
-//		ZHUXI_DBGP(("fopen %s failed !\n",outfile));
-//		exit(1);
-//	}
+	if(!(fd=fopen(outfile,"w+"))){
+		ZHUXI_DBGP(("fopen %s failed !\n",outfile));
+		exit(1);
+	}
 	for(i=0;i<256;i++){
 		mi = ipmac_list[i];
 		while(mi){
@@ -687,7 +693,7 @@ void stop_recv_arp()
 			}else{
 				/*printf("%s %02X:%02X:%02X:%02X:%02X:%02X\n",inet_ntoa(mi->ip),\*/
 					/*mi->mac[0],mi->mac[1],mi->mac[2],mi->mac[3],mi->mac[4],mi->mac[5]);*/
-				printf("%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", mi->seconds,\
+				fprintf(fd, "%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", mi->seconds,\
 					mi->mac[0],mi->mac[1],mi->mac[2],mi->mac[3],mi->mac[4],mi->mac[5], inet_ntoa(mi->ip));
 			}
 			mi = mi->next;
