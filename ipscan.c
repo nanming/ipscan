@@ -346,6 +346,7 @@ static int create_arpsock(char *ifname,struct sockaddr_ll *from)
 	return sock;
 }
 
+#if 0
 void read_macband_list(void)
 {
 	FILE					*fd;
@@ -402,6 +403,7 @@ void read_macband_list(void)
 */
 }
 
+#endif
 static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int seconds)
 {
 	int						chk = 0;
@@ -410,6 +412,7 @@ static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int second
 	struct ipmac			**mli;
 	struct devinfo			*di=devinfo_list;
 	uint8_t					ins = 0;
+	struct net_dev			*net_dev_tmp;
 
 	if (sz < 42) 	/* ETH_LEN+ARPH_LEN = 42 */
 		return;
@@ -439,16 +442,22 @@ static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int second
 	}
 	if(!chk)
 		return;
-	mli = &ipmac_list[arph->s_mac[5]];
+	mli = &ipmac_list[arph->s_mac[5]]; /*hash func*/
 	while(*mli){
-		if(!(memcmp((char *)(*mli)->mac,(char *)arph->s_mac,6))){
-			if((*mli)->ip.s_addr == *(uint32_t *)arph->s_ip)
-				return;
-			if(!((*mli)->bind)){
-				memcpy(&(*mli)->ip,arph->s_ip,4);
-				ins = 1;
-				break;
+		if(!(memcmp((char *)(*mli)->net_dev.mac,(char *)arph->s_mac,6))){
+			net_dev_tmp = &(*mli)->net_dev;
+			while(net_dev_tmp)
+			{
+				if(net_dev_tmp->ip.s_addr == *(uint32_t *)arph->s_ip)
+					return;
+				if(!(net_dev_tmp->bind)){
+					memcpy(&net_dev_tmp->ip,arph->s_ip,4);
+					ins = 1;
+					break;
 			}
+				net_dev_tmp = net_dev_tmp->next;
+			}
+				}
 		}
 		mli = &(*mli)->next;
 	}
@@ -459,11 +468,16 @@ static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int second
 			ZHUXI_DBGP(("malloc failed !\n"));
 			return;
 		}
-		memcpy(&(*mli)->ip,arph->s_ip,4);
-		memcpy((*mli)->mac,arph->s_mac,6);
-		(*mli)->bind = 0;
-		(*mli)->seconds = seconds;
-		strcpy((*mli)->notes,"NONE");
+		net_dev_tmp = &(*mli)->net_dev;
+		while(net_dev_tmp->next)
+		{
+			net_dev_tmp = net_dev_tmp->next;
+		}
+		memcpy(&net_dev_tmp->ip,arph->s_ip,4);
+		memcpy(&net_dev_tmp->mac,arph->s_mac,6);
+		net_dev_tmp->bind = 0;
+		net_dev_tmp->seconds = seconds;
+		strcpy(net_dev_tmp->notes,"NONE");
 		(*mli)->next = NULL;
 		mli = &(*mli)->next;
 	}
@@ -482,10 +496,10 @@ void recv_arp_pkt()
 	memset(data,0,sizeof(data));
 	sigprocmask(SIG_BLOCK,&g_ns,NULL);
 	while(1){
-		seconds = time((time_t*)NULL);	
 		if((ret=recvfrom(arpsock,data,sizeof(data),0,(struct sockaddr*)&ans_addr,&alen)) < 0){
 			break;
 		}
+		seconds = time((time_t*)NULL);	
 		/*printf("time = %ld\n", seconds);*/
 		unpack_arp(data,ret,&ans_addr, seconds);
 		seconds = 0;
@@ -661,6 +675,7 @@ void stop_recv_arp()
 	int						i;
 	char					cpy_cmd[128];
 	char					*str = NULL;
+	struct net_dev			*net_dev_tmp;
 
 	if(scan_max_time++ < SCAN_MAX_TIME){
 		if(recv_pkt){
@@ -687,14 +702,17 @@ void stop_recv_arp()
 //			fprintf(fd,"%s %02X:%02X:%02X:%02X:%02X:%02X %d %s\n",inet_ntoa(mi->ip),\
 //				mi->mac[0],mi->mac[1],mi->mac[2],mi->mac[3],mi->mac[4],mi->mac[5],mi->bind,mi->notes);
 			if(add){
-				if(!mi->bind)
-					printf("%s %02X:%02X:%02X:%02X:%02X:%02X\n",inet_ntoa(mi->ip),\
-						mi->mac[0],mi->mac[1],mi->mac[2],mi->mac[3],mi->mac[4],mi->mac[5]);
+				if(!mi->net_dev.bind)
+					printf("%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", mi->net_dev.seconds,\
+						mi->net_dev.mac[0],mi->net_dev.mac[1],mi->net_dev.mac[2],mi->net_dev.mac[3],mi->net_dev.mac[4],mi->net_dev.mac[5], inet_ntoa(mi->net_dev.ip));
 			}else{
-				/*printf("%s %02X:%02X:%02X:%02X:%02X:%02X\n",inet_ntoa(mi->ip),\*/
-					/*mi->mac[0],mi->mac[1],mi->mac[2],mi->mac[3],mi->mac[4],mi->mac[5]);*/
-				fprintf(fd, "%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", mi->seconds,\
-					mi->mac[0],mi->mac[1],mi->mac[2],mi->mac[3],mi->mac[4],mi->mac[5], inet_ntoa(mi->ip));
+				net_dev_tmp = &mi->net_dev;
+				while(net_dev_tmp)
+				{
+					fprintf(fd, "%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", net_dev_tmp->seconds,\
+						net_dev_tmp->mac[0],net_dev_tmp->mac[1],net_dev_tmp->mac[2],net_dev_tmp->mac[3],net_dev_tmp->mac[4],net_dev_tmp->mac[5], inet_ntoa(net_dev_tmp->ip));
+					net_dev_tmp = net_dev_tmp->next;
+				}
 			}
 			mi = mi->next;
 		}

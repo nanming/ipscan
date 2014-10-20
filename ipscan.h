@@ -2,6 +2,7 @@
 #define _MACSACN_H
 
 #define DEFDEV					"eth0"
+//#define MACDEFNUM					1024
 #define	DEF_FILE				"/tmp/ipscan.tmp"
 #define	MACBAND_FILE			"/etc/kingcan/macband_list.cfg"
 #define IPMAC_EXPHOST_FILE		"/etc/kingcan/macband_exphost.cfg"
@@ -43,14 +44,28 @@ typedef struct arp_hdr
    uint8_t	 	d_ip[4];			/* Target IP address.  */
 }ARP_HEADER;
 
+//struct ipmac
+//{
+	//struct ipmac		*next;
+	//struct in_addr	 	ip;
+	//unsigned char 		mac[6];
+	//unsigned short		bind;
+	//long int 		seconds;
+	//char				notes[64];
+//};
+struct net_dev {
+	struct in_addr ip;
+	unsigned char	mac[6];
+	unsigned short	bind;
+	long int	seconds;
+	char 		notes[64];
+	struct net_dev *next;
+};
+
 struct ipmac
 {
 	struct ipmac		*next;
-	struct in_addr	 	ip;
-	unsigned char 		mac[6];
-	unsigned short		bind;
-	long int 		seconds;
-	char				notes[64];
+	struct net_dev		net_dev;
 };
 
 struct devinfo
