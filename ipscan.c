@@ -49,6 +49,9 @@ PT_IpScanAddr IpScanAddrHead;
 static void usage()
 {
 	printf("usage:  ipscan < -i ip_pool > [-c pack_count] [-w timeval] [ -d devname ] [-o outputfile]\n");
+	printf("\n	example: ./ipscan -i 192.168.0.73,192.168.0.100\n");
+	printf("	         ./ipscan -i 192.168.0.0-192.168.0.255\n");
+	printf("	         ./ipscan -i 192.168.0.0-192.168.0.255,192.168.1.0-192.168.1.255\n");
     exit(1);
 }
 
@@ -64,7 +67,7 @@ int main(int argc,char **argv)
 	PT_IpScanAddr 				si;
 	/*pthread_t 				tid = 0;*/
 
-	int						i,j,on=1,count = 0;
+	int						i,j = 1,on=1,count = 0;
 	
 	parse_args(argc,argv);
 
@@ -135,9 +138,10 @@ int main(int argc,char **argv)
 
 				((struct in_addr *)arph->d_ip)->s_addr = htonl(cur);
 				sendto(arpsock,buf,ETH_LEN+ARPH_LEN,0,(struct sockaddr*)&arpto,alen);
-				usleep(1000);
+				/*printf("sendto line %d=     dst ip=%s\n", __LINE__,inet_ntoa(*(struct in_addr *)arph->d_ip));*/
+				usleep(10);
 			}
-		si = si->next;
+			si = si->next;
 			if(count > MAX_SCAN_IP)
 				break;
 		}
@@ -159,7 +163,7 @@ static void parse_args( int argc, char** argv )
 	int length = 0;
 	int token_flag = 0;
 	struct in_addr	startip,endip;
-	PT_IpPool ptmp, psave;
+	PT_IpPool ptmp;
 	PT_IpPool IpPoolTmp;
 	PT_IpScanAddr pIpScanAddrtmp, pIpScanAddrSave;
 	PT_IpScanAddr IpScanAddrTmp;
@@ -203,7 +207,8 @@ static void parse_args( int argc, char** argv )
 					IpPoolTmp->name = token;
 					if (IpPoolHead == NULL)
 					{
-						IpPoolHead = psave;
+						/*IpPoolHead = psave;*/
+						IpPoolHead = IpPoolTmp;
 					}
 					else
 					{
@@ -221,26 +226,28 @@ static void parse_args( int argc, char** argv )
 
 				while(ptmp)
 				{
+					/*printf("ptmp->name %s\n", ptmp->name);*/
 					tmp[0] = strtok(ptmp->name, "-");
-					/*printf("tmp[0] = %s\n", tmp[0]);*/
 
 					while((token = strtok(NULL, "-")) != NULL)
 					{
 						tmp[1] = token;
 						token_flag = 1;
 					}
+					/*printf("starip=%s endip = %s\n", tmp[0], tmp[1]);*/
 
-					if (!token && token_flag == 0)
+					if (!token && (token_flag == 0))
 					{
 						tmp[1] = tmp[0];
 					}
+					token_flag = 0;
 
 					if(!inet_aton(tmp[0], &startip)){
 						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));
 						 usage();
 					 }
 					if(!inet_aton(tmp[1], &endip)){
-						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[0]));
+						 ZHUXI_DBGP(("%s : bad IP address format !\n",tmp[1]));
 						 usage();
 					 }
 
@@ -270,15 +277,6 @@ static void parse_args( int argc, char** argv )
 					}
 					ptmp = ptmp->next;
 				}
-				/*pIpScanAddrtmp = IpScanAddrHead;*/
-#if 0
-				while(pIpScanAddrtmp)
-				{
-					length++;
-					pIpScanAddrtmp = pIpScanAddrtmp->next;
-				}
-				printf("length = %d\n", length);
-#endif
 				break;
 			case 'd':
 				strncpy(devname,optarg,sizeof(devname));
@@ -402,8 +400,8 @@ void read_macband_list(void)
 	}
 */
 }
-
 #endif
+
 static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int seconds)
 {
 	int						chk = 0;
@@ -412,7 +410,8 @@ static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int second
 	struct ipmac			**mli;
 	struct devinfo			*di=devinfo_list;
 	uint8_t					ins = 0;
-	struct net_dev			*net_dev_tmp;
+	struct net_dev			*net_dev_tmp, *net_dev_save;
+	struct in_addr			ip_tmp;
 
 	if (sz < 42) 	/* ETH_LEN+ARPH_LEN = 42 */
 		return;
@@ -443,43 +442,53 @@ static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int second
 	if(!chk)
 		return;
 	mli = &ipmac_list[arph->s_mac[5]]; /*hash func*/
-	while(*mli){
-		if(!(memcmp((char *)(*mli)->net_dev.mac,(char *)arph->s_mac,6))){
-			net_dev_tmp = &(*mli)->net_dev;
-			while(net_dev_tmp)
-			{
-				if(net_dev_tmp->ip.s_addr == *(uint32_t *)arph->s_ip)
-					return;
-				if(!(net_dev_tmp->bind)){
-					memcpy(&net_dev_tmp->ip,arph->s_ip,4);
-					ins = 1;
-					break;
-			}
-				net_dev_tmp = net_dev_tmp->next;
-			}
-				}
-		}
-		mli = &(*mli)->next;
-	}
-	if(!ins){
+	/*printf("mac[5] = %x\n", arph->s_mac[5]); */
+	if(!*mli){
+		/*if((memcmp((char *)(*mli)->net_dev.mac,(char *)arph->s_mac,6))){*/
+		/*printf("arph->s_ip = %d %d %d %d\n", *(arph->s_ip), *(arph->s_ip+1),*(arph->s_ip+2), *(arph->s_ip+3));*/
 		if(check_exphost(inet_ntoa(*(struct in_addr *)arph->s_ip)))
 			return;
 		if(!(*mli=malloc(sizeof(struct ipmac)))){
 			ZHUXI_DBGP(("malloc failed !\n"));
 			return;
 		}
+		memcpy(&(*mli)->net_dev.ip,arph->s_ip,4);
+		memcpy(&(*mli)->net_dev.mac,arph->s_mac,6);
+		(*mli)->net_dev.bind = 0;
+		(*mli)->net_dev.seconds = seconds;
+		strcpy((*mli)->net_dev.notes,"NONE");
+		(*mli)->next = NULL;
+		mli = &(*mli)->next;
+	}
+	else
+	{
+		net_dev_tmp = &(*mli)->net_dev;
+		/*printf("arph->s_ip = %d %d %d %d\n", *(arph->s_ip), *(arph->s_ip+1),*(arph->s_ip+2), *(arph->s_ip+3));*/
+		memcpy(&ip_tmp,arph->s_ip,4);
+		while(net_dev_tmp)
+		{
+			if (ip_tmp.s_addr == net_dev_tmp->ip.s_addr)
+			{
+				/*printf("the equal ip arph->s_ip = %d %d %d %d\n", *(arph->s_ip), *(arph->s_ip+1),*(arph->s_ip+2), *(arph->s_ip+3));*/
+				return;
+			}
+			net_dev_tmp = net_dev_tmp->next;
+			/*printf("ip = %s\n" ,inet_ntoa(net_dev_tmp->ip));*/
+			/*printf("ip_tmp = %s\n" ,inet_ntoa(ip_tmp));*/
+		}
+		net_dev_save = (struct net_dev *)malloc(sizeof(struct net_dev));
 		net_dev_tmp = &(*mli)->net_dev;
 		while(net_dev_tmp->next)
 		{
 			net_dev_tmp = net_dev_tmp->next;
 		}
-		memcpy(&net_dev_tmp->ip,arph->s_ip,4);
-		memcpy(&net_dev_tmp->mac,arph->s_mac,6);
-		net_dev_tmp->bind = 0;
-		net_dev_tmp->seconds = seconds;
-		strcpy(net_dev_tmp->notes,"NONE");
-		(*mli)->next = NULL;
-		mli = &(*mli)->next;
+		memcpy(&net_dev_save->ip,arph->s_ip,4);
+		memcpy(&net_dev_save->mac,arph->s_mac,6);
+		net_dev_save->bind = 0;
+		net_dev_save->seconds = seconds;
+		strcpy(net_dev_save->notes,"NONE");
+		net_dev_tmp->next = net_dev_save;
+		net_dev_save->next = NULL;
 	}
 
 	recv_pkt = 1;
@@ -707,6 +716,7 @@ void stop_recv_arp()
 						mi->net_dev.mac[0],mi->net_dev.mac[1],mi->net_dev.mac[2],mi->net_dev.mac[3],mi->net_dev.mac[4],mi->net_dev.mac[5], inet_ntoa(mi->net_dev.ip));
 			}else{
 				net_dev_tmp = &mi->net_dev;
+				/*printf("write to file\n");*/
 				while(net_dev_tmp)
 				{
 					fprintf(fd, "%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", net_dev_tmp->seconds,\
