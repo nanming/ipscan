@@ -462,20 +462,34 @@ static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int second
 	}
 	else
 	{
-		net_dev_tmp = &(*mli)->net_dev;
 		/*printf("arph->s_ip = %d %d %d %d\n", *(arph->s_ip), *(arph->s_ip+1),*(arph->s_ip+2), *(arph->s_ip+3));*/
 		memcpy(&ip_tmp,arph->s_ip,4);
-		while(net_dev_tmp)
+		while(*mli)
 		{
+			net_dev_tmp = &(*mli)->net_dev;
 			if (ip_tmp.s_addr == net_dev_tmp->ip.s_addr)
 			{
 				/*printf("the equal ip arph->s_ip = %d %d %d %d\n", *(arph->s_ip), *(arph->s_ip+1),*(arph->s_ip+2), *(arph->s_ip+3));*/
 				return;
 			}
-			net_dev_tmp = net_dev_tmp->next;
+			mli = &(*mli)->next;
+			/*net_dev_tmp = net_dev_tmp->next;*/
 			/*printf("ip = %s\n" ,inet_ntoa(net_dev_tmp->ip));*/
 			/*printf("ip_tmp = %s\n" ,inet_ntoa(ip_tmp));*/
 		}
+		if(!(*mli=malloc(sizeof(struct ipmac)))){
+			ZHUXI_DBGP(("malloc failed !\n"));
+			return;
+		}
+		memcpy(&(*mli)->net_dev.ip,arph->s_ip,4);
+		memcpy(&(*mli)->net_dev.mac,arph->s_mac,6);
+		(*mli)->net_dev.bind = 0;
+		(*mli)->net_dev.seconds = seconds;
+		strcpy((*mli)->net_dev.notes,"NONE");
+		(*mli)->next = NULL;
+		mli = &(*mli)->next;
+
+#if 0
 		net_dev_save = (struct net_dev *)malloc(sizeof(struct net_dev));
 		net_dev_tmp = &(*mli)->net_dev;
 		while(net_dev_tmp->next)
@@ -489,6 +503,7 @@ static void unpack_arp(char *buf,int sz,struct sockaddr_ll *ans, long int second
 		strcpy(net_dev_save->notes,"NONE");
 		net_dev_tmp->next = net_dev_save;
 		net_dev_save->next = NULL;
+#endif
 	}
 
 	recv_pkt = 1;
@@ -716,13 +731,9 @@ void stop_recv_arp()
 						mi->net_dev.mac[0],mi->net_dev.mac[1],mi->net_dev.mac[2],mi->net_dev.mac[3],mi->net_dev.mac[4],mi->net_dev.mac[5], inet_ntoa(mi->net_dev.ip));
 			}else{
 				net_dev_tmp = &mi->net_dev;
-				/*printf("write to file\n");*/
-				while(net_dev_tmp)
-				{
-					fprintf(fd, "%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", net_dev_tmp->seconds,\
-						net_dev_tmp->mac[0],net_dev_tmp->mac[1],net_dev_tmp->mac[2],net_dev_tmp->mac[3],net_dev_tmp->mac[4],net_dev_tmp->mac[5], inet_ntoa(net_dev_tmp->ip));
-					net_dev_tmp = net_dev_tmp->next;
-				}
+				fprintf(fd, "%ld %02X:%02X:%02X:%02X:%02X:%02X %s * *\n", net_dev_tmp->seconds,\
+					net_dev_tmp->mac[0],net_dev_tmp->mac[1],net_dev_tmp->mac[2],net_dev_tmp->mac[3],net_dev_tmp->mac[4],net_dev_tmp->mac[5], inet_ntoa(net_dev_tmp->ip));
+				net_dev_tmp = net_dev_tmp->next;
 			}
 			mi = mi->next;
 		}
