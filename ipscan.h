@@ -2,15 +2,12 @@
 #define _MACSACN_H
 
 #define DEFDEV					"eth0"
-//#define	DEF_FILE				"/tmp/ipscan.tmp"
 #define	MACBAND_FILE			"/etc/kingcan/macband_list.cfg"
 #define IPMAC_EXPHOST_FILE		"/etc/kingcan/macband_exphost.cfg"
 #define IPMAC_EXPHOST_MAX		10
 #define VERSION					"v2.00"
-#define	SCAN_MAX_TIME			5
 #define	TIMEOUT_SEC			0
 #define	TIMEOUT_USEC		500000
-#define	RECV_WAITTIME		2
 
 #define ETH_LEN 			14
 #define ARPH_LEN			28

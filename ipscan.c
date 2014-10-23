@@ -26,7 +26,6 @@ struct scanaddr			*scanaddr_list = NULL;
 struct ipmac			*ipmac_list[256];
 static int				recv_pkt = 0;
 static int				idle = 0;
-static int				scan_max_time = 0;
 static char 			exphosts[IPMAC_EXPHOST_MAX][32];
 
 static int pack_count = 1;
@@ -50,8 +49,17 @@ PT_IpScanAddr IpScanAddrHead = NULL;
 
 static void usage()
 {
-	printf("usage:  ipscan <ip_pool > [-t time_plus] [-c pack_count] [-w timeval] [ -d devname ] [-o outputfile] [-n ipscan_count]\n");
-	printf("\n	example: ./ipscan 192.168.0.73,192.168.0.100\n");
+	printf("usage:  ipscan <ip_addrs> [option]\n\n");
+	printf("	arguments:\n");
+	printf("	         ip_addrs, ip address pools\n");
+	printf("	options:\n");
+	printf("	         -t time_base, seconds need to be added to timestamp\n");
+	printf("	         -c pack_count, count of packets should be send to every ip\n");
+	printf("	         -w wait_time, seconds for wait after packets send finished\n");
+	printf("	         -d devname, net device interface name\n");
+	printf("	         -o output_file, file name for output\n");
+	printf("	         -n max_ips, max ips should be scan\n");
+	printf("	example: ./ipscan 192.168.0.73,192.168.0.100\n");
 	printf("	         ./ipscan 192.168.0.0-192.168.0.255\n");
 	printf("	         ./ipscan 192.168.0.0-192.168.0.255,192.168.1.0-192.168.1.255\n");
     exit(1);
@@ -83,9 +91,9 @@ int main(int argc,char **argv)
 	get_exphost();
 	/*if(add)*/
 		/*read_macband_list();*/
-	
- 	tv_out.tv_sec=TIMEOUT_SEC;
- 	tv_out.tv_usec=TIMEOUT_USEC;
+
+	tv_out.tv_sec=TIMEOUT_SEC;
+	tv_out.tv_usec=TIMEOUT_USEC;
 	setsockopt(arpsock,SOL_SOCKET,SO_RCVTIMEO,&tv_out,sizeof(tv_out));
 
 	if(getsockname(arpsock,(struct sockaddr *)&arpfrom,&alen) == -1){
@@ -157,11 +165,10 @@ int main(int argc,char **argv)
 		}
 		j++;
 	}
-	sleep(time_out);
 	signal(SIGALRM,stop_recv_arp);
-	alarm(1);
+	alarm(time_out+1);
 	while(1){
-		sleep(1000);
+		sleep(10);
 	};
 	return 0;
 }
@@ -501,7 +508,7 @@ void recv_arp_pkt()
 		if((ret=recvfrom(arpsock,data,sizeof(data),0,(struct sockaddr*)&ans_addr,&alen)) < 0){
 			break;
 		}
-		seconds = time((time_t*)NULL);	
+		seconds = time((time_t*)NULL);
 		/*printf("time = %ld\n", seconds);*/
 		unpack_arp(data,ret,&ans_addr, seconds + time_plus);
 		seconds = 0;
@@ -678,17 +685,6 @@ void stop_recv_arp()
 	char					cpy_cmd[128];
 	char					*str = NULL;
 
-	if(scan_max_time++ < SCAN_MAX_TIME){
-		if(recv_pkt){
-			recv_pkt = 0;
-			idle = 0;
-			alarm(1);
-			return;
-		}else if(idle++ < RECV_WAITTIME){
-			alarm(1);
-			return;		
-		}
-	}
 
 	signal(SIGIO,SIG_IGN);
 	shutdown(arpsock,SHUT_RDWR);
