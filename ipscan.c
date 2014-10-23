@@ -196,17 +196,49 @@ static void parse_args( int argc, char** argv )
 	while((c=getopt(argc,argv,"c:t:w:d:o:n:")) != -1){
 		switch(c){
 			case 'c':
-				pack_count = atoi(optarg);
-			  	break;
+				if(((char)(*optarg) >= 48 && (char)(*optarg) <= 57))
+				{
+					pack_count = atoi(optarg);
+					break;
+				}
+				else
+				{
+					ZHUXI_DBGP(("error: pack_count arg is not legal!\n"));
+					exit(1);
+				}
 			case 't':
-				time_plus = (long int)atoi(optarg);
-				break;
+				if(((char)(*optarg) >= 48 && (char)(*optarg) <= 57))
+				{
+					time_plus = atol(optarg);
+					break;
+				}
+				else
+				{
+					ZHUXI_DBGP(("error: time_base arg is not legal!\n"));
+					exit(1);
+				}
 			case 'n':
-				ipscan_count = atoi(optarg);
-				break;
+				if(((char)(*optarg) >= 48 && (char)(*optarg) <= 57))
+				{
+					ipscan_count = atoi(optarg);
+					break;
+				}
+				else
+				{
+					ZHUXI_DBGP(("error: max_ips arg is not legal!\n"));
+					exit(1);
+				}
 			case 'w':
-				time_out= atoi(optarg);
-			  	break;
+				if(((char)(*optarg) >= 48 && (char)(*optarg) <= 57))
+				{
+					time_out= atoi(optarg);
+					break;
+				}
+				else
+				{
+					ZHUXI_DBGP(("error: wait_time arg is not legal!\n"));
+					exit(1);
+				}
 			case 'd':
 				strncpy(devname,optarg,sizeof(devname));
 			  	break;
